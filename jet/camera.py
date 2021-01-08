@@ -70,10 +70,10 @@ def get_laser_loc(gray):
 def detect_laser(gray):
     print("detecting laser")
     laser_loc = get_laser_loc(gray)
-    # if outside_box(laser_loc):
-    #     return
-    # else:
-    #     move_mouse(laser_loc)
+    if outside_box(laser_loc):  # TODO: implement
+        return
+    else:
+        move_mouse(laser_loc)  # TODO: implement
 
 
 def most_frequent(lst):
@@ -84,15 +84,22 @@ def most_frequent(lst):
 portXcoord, portYcoord = [], []
 
 
+def get_line(p1, p2):
+    m = (p2[1] - p1[1]) / (p2[0] - p1[0])
+    c = p1[1] - m * p1[0]
+    return m, c
+
+
 def calibrate_box(box):
-    lu, ld, ru, rd = box
+    rd, ld, lu, ru = box
     width = max(ru[0], rd[0]) - min(lu[0], ld[0])
     height = max(ld[1], rd[1]) - min(lu[1], ru[1])  # FIXME: doesn't make sense
-    portXcoord, portYcoord = np.zeroes((width, height)), np.zeroes((width, height))
-    # FIXME
-    # for i in range(width):
-    #     for j in range(height):
-    #         start
+    portXcoord, portYcoord = np.zeros((width, height)), np.zeros((width, height))
+    for x in range(width):  # NOTE: remember to account for paddings around
+        for y in range(height):
+            start_x, end_x = get_x_values_for_row(y)
+            start_y, end_y = get_y_values_for_column(x)
+            # FIXME: implement
 
 
 while True:
@@ -112,7 +119,7 @@ while True:
     # TODO: retrigger this on a certain keystroke, check
     # if "r" works
     if state == DETECT_BOX:
-        if len(past_boxes) > 30:
+        if len(past_boxes) > 50:
             # then can deduce box.
             # box is the one with most occurrences in past_boxes
             # flattened = np.array([box.flatten() for box in past_boxes])
@@ -120,7 +127,7 @@ while True:
             # unique, counts = np.unique(flattened)
             # box = unique[np.argmax(counts)]
             # print()
-            box = past_boxes[98]
+            box = past_boxes[48]
             past_boxes = []
             calibrate_box(box)
             state = DETECT_LASER
