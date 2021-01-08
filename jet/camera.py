@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import cv2
+from laser import *
 
 display_fps = False
 

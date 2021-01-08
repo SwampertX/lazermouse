@@ -4,48 +4,21 @@ import cv2
 import matplotlib.pyplot as plt
 
 # Read image
-img2 = cv2.imread('laser_point.jpg')
+img = cv2.imread('laser_point.jpg')
 scale_percent = 20 # percent of original size
-width = int(img2.shape[1] * scale_percent / 100)
-height = int(img2.shape[0] * scale_percent / 100)
+width = int(img.shape[1] * scale_percent / 100)
+height = int(img.shape[0] * scale_percent / 100)
 dim = (width, height)
-img2 = cv2.resize(img2, dim, interpolation=cv2.INTER_AREA)
+img = cv2.resize(img, dim, interpolation=cv2.INTER_AREA)
 
+# Get red from image
+hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+low_red = np.array([161, 155, 84])
+high_red = np.array([179, 255, 255])
+red_mask = cv2.inRange(hsv, low_red, high_red)
+red = cv2.bitwise_and(img, img, mask=red_mask)
 
-# Detect laser via template matching
-template = cv2.imread('laser.PNG', 0)
-w, h = template.shape[::-1]
-
-methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-            'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
-
-for meth in methods:
-    img = img2.copy()
-    method = eval(meth)
-
-    # Apply template Matching
-    res = cv2.matchTemplate(img,template,method)
-    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-
-    # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
-    if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
-        top_left = min_loc
-    else:
-        top_left = max_loc
-    bottom_right = (top_left[0] + w, top_left[1] + h)
-
-    cv2.rectangle(img,top_left, bottom_right, 255, 2)
-
-    plt.subplot(121),plt.imshow(res,cmap = 'gray')
-    plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
-    plt.subplot(122),plt.imshow(img,cmap = 'gray')
-    plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
-    plt.suptitle(meth)
-
-    plt.show()
-
-
-# Display image
-cv2.imshow("img", img)
+# Display red
+cv2.imshow("img", red)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
