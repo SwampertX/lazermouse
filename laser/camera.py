@@ -2,6 +2,7 @@ import time
 import numpy as np
 import cv2
 from laser import *
+import pyautogui
 
 IDLE = -1
 DETECT_BOX = 0
@@ -13,6 +14,8 @@ state = IDLE
 box = None
 cap = cv2.VideoCapture(0)
 time1 = time.time()
+width, height = 0, 0
+screenres = pyautogui.size()
 
 # phase 1: detecting rectangle
 # phase 2: detecting dot and move mouse
@@ -61,23 +64,31 @@ def get_laser_loc_blob(gray):
     cv2.imshow("frame", im_with_keypoints)
 
 
-def get_laser_loc(gray):
-    pt = cv2.minMaxLoc(gray)
-    print(pt)
+def get_laser_loc_raw(gray):
+    minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(gray)
+    if maxVal < 254:  # if too dark treat as no laser
+        return None
+    else:  # return (x_perc, y_perc)
+        matinv = np.linalg.pinv(mat)
+        tmp = np.array([maxLoc[0], maxLoc[1], 1])
+        return np.dot(matinv, tmp)[:2]
 
 
 def outside_box(laser_loc):
-    pass  # FIXME
+    return laser_loc[0] < 0 or laser_loc[0] > 1 or laser_loc[0] < 0 or laser_loc[0] > 1
 
 
 def move_mouse(laser_loc):
-    pass  # FIXME
+    x = int(laser_loc[0] * screenres[0])
+    y = int(laser_loc[1] * screenres[1])
+    pyautogui.moveTo(x, y)
 
 
 def detect_laser(gray):
     print("detecting laser")
-    laser_loc = get_laser_loc(gray)
-    if outside_box(laser_loc):  # TODO: implement
+    laser_loc_raw = get_laser_loc_raw(gray)
+    laser_loc = np.divide(laser_loc_raw, np.array([width, height]))
+    if outside_box(laser_loc):  # TODO: check if outside_box works as intended
         return
     else:
         move_mouse(laser_loc)  # TODO: implement
@@ -110,6 +121,8 @@ def calibrate_box(box, img):
     warped = cv2.warpPerspective(img, mat, (maxWidth, maxHeight))
     cv2.imshow("frame", warped)
     cv2.imwrite("result.png", warped)
+    global width, height
+    width, height = maxWidth, maxHeight
     return mat
 
 
@@ -143,6 +156,8 @@ while True:
             # update_dict(gray)
             mat = calibrate_box(box, gray)
             state = DETECT_LASER
+            cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
+            cap.set(cv2.CAP_PROP_EXPOSURE, -2.0)
         detect_box(gray)
     elif state == DETECT_LASER:
         detect_laser(gray)
