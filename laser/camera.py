@@ -68,6 +68,7 @@ def get_laser_loc_blob(gray):
 
 def get_laser_loc_raw(gray):
     minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(gray)
+    print(maxVal, maxLoc)
     if maxVal < 254:  # if too dark treat as no laser
         return np.array([-1, -1])
     else:  # return (x_perc, y_perc)
@@ -114,8 +115,12 @@ def calibrate_box(box, img):
     print("box", box)
     print(maxWidth, maxHeight)
 
+    # dst = np.array(
+    #     [[0, 0], [maxWidth - 1, 0], [maxWidth - 1, maxHeight - 1], [0, maxHeight - 1]],
+    #     dtype="float32",
+    # )
     dst = np.array(
-        [[0, 0], [maxWidth - 1, 0], [maxWidth - 1, maxHeight - 1], [0, maxHeight - 1]],
+        [[maxWidth - 1, maxHeight - 1], [0, maxHeight - 1], [0, 0], [maxWidth - 1, 0]],
         dtype="float32",
     )
 
@@ -158,8 +163,8 @@ while True:
             # update_dict(gray)
             mat = calibrate_box(box, gray)
             state = DETECT_LASER
-            cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
-            cap.set(cv2.CAP_PROP_EXPOSURE, -2.0)
+            # cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
+            # cap.set(cv2.CAP_PROP_EXPOSURE, -2.0)
         detect_box(gray)
     elif state == DETECT_LASER:
         detect_laser(gray)
