@@ -2,7 +2,9 @@ import time
 import numpy as np
 import cv2
 from laser import *
-import pyautogui
+import mouse
+
+# import pyautogui
 
 IDLE = -1
 DETECT_BOX = 0
@@ -15,7 +17,7 @@ box = None
 cap = cv2.VideoCapture(0)
 time1 = time.time()
 width, height = 0, 0
-screenres = pyautogui.size()
+screenres = (1920, 1080)
 
 # phase 1: detecting rectangle
 # phase 2: detecting dot and move mouse
@@ -67,7 +69,7 @@ def get_laser_loc_blob(gray):
 def get_laser_loc_raw(gray):
     minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(gray)
     if maxVal < 254:  # if too dark treat as no laser
-        return None
+        return np.array([-1, -1])
     else:  # return (x_perc, y_perc)
         matinv = np.linalg.pinv(mat)
         tmp = np.array([maxLoc[0], maxLoc[1], 1])
@@ -81,7 +83,7 @@ def outside_box(laser_loc):
 def move_mouse(laser_loc):
     x = int(laser_loc[0] * screenres[0])
     y = int(laser_loc[1] * screenres[1])
-    pyautogui.moveTo(x, y)
+    mouse.move(x, y)
 
 
 def detect_laser(gray):
