@@ -8,7 +8,7 @@ DETECT_BOX = 0
 DETECT_LASER = 1
 
 display_fps = False
-state = DETECT_BOX
+state = IDLE
 
 box = None
 cap = cv2.VideoCapture(0)
@@ -24,9 +24,6 @@ time1 = time.time()
 
 
 past_boxes = []
-coords = []  # all (x,y) coords on boundary
-x_values = {}  # x -> list(assoc y coords)
-y_values = {}  # y -> list(assoc x coords)
 
 
 def detect_box(gray):
@@ -46,47 +43,6 @@ def detect_box(gray):
 
     # Show canny edge
     cv2.imshow("frame", canny)
-
-
-def update_dict(gray):
-    img = cv2.Canny(gray, 110, 255)
-    contours, _ = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-
-    contour = max(contours, key=cv2.contourArea)
-    coords = contour
-    if contour is not None:
-        rect = cv2.minAreaRect(contour)
-        box = cv2.boxPoints(rect)
-        box = np.int0(box)
-    # for pt in box:
-    #     cv2.drawMarker(gray, tuple(pt.tolist()), (0, 0, 255))
-
-    # print("coords")
-    # print(coords)
-    # for coord in coords.ravel():
-    #     x_values.setdefault(coord[0], []).append(coord[1])
-    #     y_values.setdefault(coord[1], []).append(coord[0])
-    # debug
-    for coord in coords:
-        # cv2.circle(gray, tuple(coord.tolist()[0]), 0, (0, 0, 255), thickness=-1)
-        print(gray[coord.tolist()[0][0]][coord.tolist()[0][1]])
-        gray[coord.tolist()[0][0]][coord.tolist()[0][1]] = 255
-    cv2.imshow("frame", gray)
-    cv2.imwrite("result.png", gray)
-    time.sleep(10)
-
-
-# min_x, min_y define the padding for the bounding box.
-def get_x_values_for_row(y, lline, rline, x_padding):
-    min_val = (y - lline[1]) / lline[0]  # x = (y - c)/m
-    max_val = (y - rline[1]) / rline[0]  # x = (y - c)/m
-    return x_padding + min_val, x_padding + max_val
-
-
-def get_y_values_for_column(x, uline, dline, y_padding):
-    min_val = dline[0] * x + dline[1]  # y = mx + c
-    max_val = uline[0] * x + uline[1]  # y = mx + c
-    return y_padding + min_val, y_padding + max_val
 
 
 def get_laser_loc_blob(gray):
@@ -127,38 +83,34 @@ def detect_laser(gray):
         move_mouse(laser_loc)  # TODO: implement
 
 
-portXcoord, portYcoord = [], []
+mat = []
 
 
-def get_line(p1, p2):
-    m = (p2[1] - p1[1]) / (p2[0] - p1[0])
-    c = p1[1] - m * p1[0]
-    return (m, c)
+def calibrate_box(box, img):
+    box = np.float32(box)
+    br, bl, tl, tr = box
+    widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+    widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+    maxWidth = max(int(widthA), int(widthB))
 
+    heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
+    heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+    maxHeight = max(int(heightA), int(heightB))
 
-def calibrate_box(box):
-    rd, ld, lu, ru = box
-    max_x, min_x = max(ru[0], rd[0]), min(lu[0], ld[0])
-    max_y, min_y = max(ld[1], rd[1]), min(lu[1], ru[1])
-    print("maxmin")
-    print(max_x, max_y, min_x, min_y)
-    width = max_x - min_x
-    height = max_y - min_y
-    portXcoord, portYcoord = np.zeros((height, width)), np.zeros((height, width))
-    lline, rline = get_line(ld, lu), get_line(ld, lu)
-    uline, dline = get_line(lu, ru), get_line(ld, rd)
-    print("lines")
-    print(lline, rline, uline, dline)
-    for x in range(width):  # FIXME: remember to account for paddings around
-        for y in range(height):
-            start_x, end_x = get_x_values_for_row(y + min_y, lline, rline, min_x)
-            start_y, end_y = get_y_values_for_column(x + min_x, uline, dline, min_y)
-            # print("pts in cross")
-            # print(start_x, end_x, start_y, end_y)
-            yperc = (y + min_y - start_y) / (end_y - start_y)
-            xperc = (x + min_x - start_x) / (end_x - start_x)
-            portXcoord[y][x] = xperc
-            portYcoord[y][x] = yperc
+    # maxHeight, maxWidth = maxWidth, maxHeight
+    print("box", box)
+    print(maxWidth, maxHeight)
+
+    dst = np.array(
+        [[0, 0], [maxWidth - 1, 0], [maxWidth - 1, maxHeight - 1], [0, maxHeight - 1]],
+        dtype="float32",
+    )
+
+    mat = cv2.getPerspectiveTransform(box, dst)
+    warped = cv2.warpPerspective(img, mat, (maxWidth, maxHeight))
+    cv2.imshow("frame", warped)
+    cv2.imwrite("result.png", warped)
+    return mat
 
 
 while True:
@@ -189,12 +141,10 @@ while True:
             box = past_boxes[48]
             past_boxes = []
             # update_dict(gray)
-            calibrate_box(box)
-            print(portXcoord, portYcoord)
+            mat = calibrate_box(box, gray)
             state = DETECT_LASER
         detect_box(gray)
     elif state == DETECT_LASER:
-        break  # FIXME
         detect_laser(gray)
     else:  # state = IDLE
         font = cv2.FONT_HERSHEY_SIMPLEX
