@@ -24,7 +24,9 @@ time1 = time.time()
 
 
 past_boxes = []
-
+coords = [] # all (x,y) coords on boundary
+x_values = {} # x -> list(assoc y coords)
+y_values = {} # y -> list(assoc x coords)
 
 def detect_box(gray):
     # Get contours of rectangle from camera frame
@@ -39,12 +41,38 @@ def detect_box(gray):
         rect = cv2.minAreaRect(contour)
         box = cv2.boxPoints(rect)
         box = np.int0(box)
-        print(len(past_boxes))
         past_boxes.append(box)
 
     # Show canny edge
     cv2.imshow("frame", canny)
 
+def update_dict(gray):
+    img = cv2.Canny(gray, 110, 255)
+    contours, _ = cv2.findContours(
+        canny, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE
+    )
+
+    contour = max(contours, key=cv2.contourArea)
+    if contour is not None:
+        rect = cv2.minAreaRect(contour)
+        box = cv2.boxPoints(rect)
+        coords = np.int0(box)
+
+    for coord in coords.ravel():
+        x_values.setdefault(coord[0], []).append(coord[1])
+        y_values.setdefault(coord[1], []).append(coord[0])
+
+def get_x_values_for_row(row):
+    lst = x_values[row]
+    min_val = min(lst)
+    max_val = max(lst)
+    return (min, max)
+
+def get_y_values_for_column(col):
+    lst = y_values[col]
+    min_val = min(lst)
+    max_val = max(lst)
+    return (min, max)
 
 def get_laser_loc_blob(gray):
     print("blob")
@@ -130,6 +158,7 @@ while True:
             box = past_boxes[48]
             past_boxes = []
             calibrate_box(box)
+            update_dict(gray)
             state = DETECT_LASER
         detect_box(gray)
     elif state == DETECT_LASER:
